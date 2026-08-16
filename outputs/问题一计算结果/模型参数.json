@@ -1,0 +1,134 @@
+{
+  "RegionA-RealTimeInference": {
+    "model": "ARIMA",
+    "order": [
+      0,
+      0,
+      3
+    ],
+    "aic": 15830.508954720033
+  },
+  "RegionA-BatchInference": {
+    "model": "ARIMA",
+    "order": [
+      2,
+      0,
+      3
+    ],
+    "aic": 20074.9140951302
+  },
+  "RegionA-AITraining": {
+    "model": "SBA-Croston",
+    "alpha": 0.3
+  },
+  "RegionB-RealTimeInference": {
+    "model": "ARIMA",
+    "order": [
+      3,
+      0,
+      3
+    ],
+    "aic": 15378.564971231659
+  },
+  "RegionB-BatchInference": {
+    "model": "ARIMA",
+    "order": [
+      0,
+      0,
+      3
+    ],
+    "aic": 19905.32212856855
+  },
+  "RegionB-AITraining": {
+    "model": "SBA-Croston",
+    "alpha": 0.1
+  },
+  "RegionC-RealTimeInference": {
+    "model": "ARIMA",
+    "order": [
+      0,
+      0,
+      3
+    ],
+    "aic": 14972.094771189364
+  },
+  "RegionC-BatchInference": {
+    "model": "ARIMA",
+    "order": [
+      0,
+      0,
+      3
+    ],
+    "aic": 19408.607045510857
+  },
+  "RegionC-AITraining": {
+    "model": "SBA-Croston",
+    "alpha": 0.1
+  },
+  "RegionD-RealTimeInference": {
+    "model": "SBA-Croston",
+    "alpha": 0.3
+  },
+  "RegionD-BatchInference": {
+    "model": "ARIMA",
+    "order": [
+      0,
+      0,
+      3
+    ],
+    "aic": 20084.070802257476
+  },
+  "RegionD-AITraining": {
+    "model": "ARIMA",
+    "order": [
+      0,
+      0,
+      3
+    ],
+    "aic": 29350.78949003367
+  },
+  "RegionE-RealTimeInference": {
+    "model": "SBA-Croston",
+    "alpha": 0.05
+  },
+  "RegionE-BatchInference": {
+    "model": "ARIMA",
+    "order": [
+      0,
+      0,
+      3
+    ],
+    "aic": 18948.975104515113
+  },
+  "RegionE-AITraining": {
+    "model": "ARIMA",
+    "order": [
+      0,
+      0,
+      3
+    ],
+    "aic": 28332.434256888475
+  },
+  "RegionF-RealTimeInference": {
+    "model": "SBA-Croston",
+    "alpha": 0.3
+  },
+  "RegionF-BatchInference": {
+    "model": "ARIMA",
+    "order": [
+      0,
+      0,
+      3
+    ],
+    "aic": 18845.433864128747
+  },
+  "RegionF-AITraining": {
+    "model": "ARIMA",
+    "order": [
+      0,
+      0,
+      3
+    ],
+    "aic": 28466.1854645855
+  }
+}
