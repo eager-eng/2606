@@ -11,7 +11,9 @@ from 问题一 import (
     执行基础调度,
     检验调度约束,
     生成结果报告,
+    构造日内GPU总需求,
     构造到达需求序列,
+    提取最后24小时结果,
     计算预测指标,
     计算小时重叠,
     选择预测模型,
@@ -37,6 +39,31 @@ def test_到达需求按小时区域类型聚合并补零():
     assert 序列.loc[0, ("A", "X")] == 5
     assert 序列.loc[1, ("B", "Y")] == 4
     assert 序列.loc[2, ("A", "Y")] == 0
+
+
+def test_日内统计先汇总任务类型再对日期求平均():
+    列 = pd.MultiIndex.from_product(
+        [["A", "B"], ["X", "Y"]], names=["SourceRegion", "TaskType"]
+    )
+    序列 = pd.DataFrame(0.0, index=range(48), columns=列)
+    序列.loc[0, ("A", "X")] = 2
+    序列.loc[0, ("A", "Y")] = 3
+    序列.loc[24, ("A", "X")] = 4
+    序列.loc[24, ("A", "Y")] = 5
+    结果 = 构造日内GPU总需求(序列)
+    assert 结果.loc["A", 0] == 7
+    assert 结果.loc["A", 1] == 0
+    assert 结果.loc["B", 0] == 0
+
+
+def test_最后24小时图严格排除收尾时域():
+    调度 = pd.DataFrame(
+        {"ArrivalHour": [2375, 2376, 2399, 2400], "Scheduled": [True, True, True, True]}
+    )
+    资源 = pd.DataFrame({"Hour": [2375, 2376, 2399, 2400], "Region": ["A", "A", "A", "A"]})
+    末调度, 末资源 = 提取最后24小时结果(调度, 资源)
+    assert 末调度["ArrivalHour"].tolist() == [2376, 2399]
+    assert 末资源["Hour"].tolist() == [2376, 2399]
 
 
 def test_按训练段零值率执行双轨分流():

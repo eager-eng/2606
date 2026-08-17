@@ -29,6 +29,12 @@ def 构造到达需求序列(任务数据, 小时数=2400, 区域列表=None, �
     return 聚合结果.reindex(完整索引, fill_value=0).unstack(["SourceRegion", "TaskType"])
 
 
+def 构造日内GPU总需求(需求序列):
+    区域小时需求 = 需求序列.T.groupby(level="SourceRegion").sum().T
+    区域小时需求["日内小时"] = np.asarray(区域小时需求.index) % 24
+    return 区域小时需求.groupby("日内小时").mean().T
+
+
 def 选择预测模型(序列, 零值率阈值=0.6):
     return "SBA-Croston" if float((pd.Series(序列) == 0).mean()) >= 零值率阈值 else "ARIMA"
 
@@ -300,6 +306,14 @@ def 配置绘图():
     sns.set_theme(style="whitegrid", font="Microsoft YaHei")
 
 
+def 提取最后24小时结果(调度结果, 资源结果):
+    末调度 = 调度结果[
+        调度结果["ArrivalHour"].between(2376, 2399) & 调度结果["Scheduled"]
+    ].copy()
+    末资源 = 资源结果[资源结果["Hour"].between(2376, 2399)].copy()
+    return 末调度, 末资源
+
+
 def 绘制结果图(任务, 需求序列, 预测结果, 预测指标, 调度结果, 资源结果, 图形目录):
     配置绘图()
     蓝色 = ["#0B559F", "#2A7AB9", "#539DCC", "#88BEDC", "#BAD6EA"]
@@ -319,10 +333,10 @@ def 绘制结果图(任务, 需求序列, 预测结果, 预测指标, 调度结�
     轴[1].tick_params(axis="x", rotation=15)
     保存图形(图, 图形目录, "图1_任务统计")
 
-    小时需求 = 任务.assign(日内小时=任务["ArrivalHour"] % 24).groupby(["SourceRegion", "日内小时"])["GPU_Demand"].mean().unstack(fill_value=0)
+    小时需求 = 构造日内GPU总需求(需求序列)
     图, 轴 = plt.subplots(figsize=(12, 4.5))
     sns.heatmap(小时需求.reindex(区域顺序), cmap=sns.light_palette("#2A7AB9", as_cmap=True), ax=轴)
-    轴.set_title("区域日内平均到达GPU需求热力图")
+    轴.set_title("区域日内平均每小时到达GPU总需求")
     轴.set_xlabel("Hour")
     轴.set_ylabel("区域")
     保存图形(图, 图形目录, "图2_时序需求热力图")
@@ -366,7 +380,7 @@ def 绘制结果图(任务, 需求序列, 预测结果, 预测指标, 调度结�
     轴.tick_params(axis="y", rotation=0)
     保存图形(图, 图形目录, "图5_预测误差热力图")
 
-    末时段 = 调度结果[(调度结果["ArrivalHour"] >= 2376) & (调度结果["ArrivalHour"] <= 2399) & 调度结果["Scheduled"]].copy()
+    末时段, 末资源 = 提取最后24小时结果(调度结果, 资源结果)
     图, 轴 = plt.subplots(figsize=(13, 6))
     类型颜色 = dict(zip(类型顺序, 红色))
     for 区域序号, 区域 in enumerate(区域顺序):
@@ -374,22 +388,24 @@ def 绘制结果图(任务, 需求序列, 预测结果, 预测指标, 调度结�
         for _, 行 in 当前区域.iterrows():
             轴.broken_barh([(行["StartHour"], 行["FinishHour"] - 行["StartHour"])], (区域序号 - 0.35, 0.7), facecolors=类型颜色[行["TaskType"]], alpha=0.55)
     轴.set_yticks(range(len(区域顺序)), 区域顺序)
-    轴.set_xlim(2376, 2406)
+    轴.set_xlim(2376, 2400)
+    轴.set_xticks([2376, 2380, 2384, 2388, 2392, 2396, 2399])
     轴.set_xlabel("Hour")
     轴.set_ylabel("执行区域")
-    轴.set_title("2376—2405时段任务调度甘特图")
+    轴.set_title("2376—2399时段任务调度甘特图")
     轴.legend(handles=[Patch(color=类型颜色[类型], label=类型) for 类型 in 类型顺序], loc="upper center", ncol=3)
     保存图形(图, 图形目录, "图6_末时段调度甘特图")
 
     图, 轴 = plt.subplots(figsize=(12, 5))
-    末资源 = 资源结果[(资源结果["Hour"] >= 2376) & (资源结果["Hour"] <= 2405)]
     for 序号, 区域 in enumerate(区域顺序):
         数据 = 末资源[末资源["Region"] == 区域]
         轴.plot(数据["Hour"], 数据["GPU_Utilization"] * 100, color=区域颜色[序号], marker="o", ms=3, label=区域)
     轴.axhline(100, color=红色[0], linestyle="--", linewidth=1, label="容量上限")
     轴.set_xlabel("Hour")
     轴.set_ylabel("GPU利用率 (%)")
-    轴.set_title("末时段六区域GPU利用率")
+    轴.set_xlim(2376, 2399)
+    轴.set_xticks([2376, 2380, 2384, 2388, 2392, 2396, 2399])
+    轴.set_title("最后24小时六区域GPU利用率")
     轴.legend(ncol=4)
     保存图形(图, 图形目录, "图7_区域GPU利用率")
 
@@ -468,6 +484,10 @@ def 主程序():
     数据统计.to_csv(输出目录 / "数据统计.csv", index=False, encoding="utf-8-sig")
     预测结果.to_csv(输出目录 / "预测结果.csv", index=False, encoding="utf-8-sig")
     预测指标.to_csv(输出目录 / "预测指标.csv", index=False, encoding="utf-8-sig")
+    图2数据 = 构造日内GPU总需求(需求序列).rename_axis("Region").reset_index().melt(
+        id_vars="Region", var_name="HourOfDay", value_name="Mean_Arrival_GPU_Demand"
+    )
+    图2数据.to_csv(输出目录 / "区域日内小时GPU总需求.csv", index=False, encoding="utf-8-sig")
     目标调度.to_csv(输出目录 / "逐任务调度.csv", index=False, encoding="utf-8-sig")
     资源末段.to_csv(输出目录 / "区域逐时资源.csv", index=False, encoding="utf-8-sig")
     检验结果.to_csv(输出目录 / "约束检验.csv", index=False, encoding="utf-8-sig")
