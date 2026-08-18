@@ -167,3 +167,27 @@ def test_区域融合表直接给出相对无储能的储能增量影响():
     assert abs(等权["StorageNetImportStdReduction_MW"] - np.sqrt(200.0 / 3.0) / 2.0) < 1e-12
     assert 等权["StorageMeanHourlyRampReduction_MW_per_h"] == 5.0
     assert 等权["StoragePeakValleyReduction_MW"] == 10.0
+
+
+def test_全时段净外送时峰值净购电按零计算():
+    逐时结果 = pd.DataFrame(
+        {
+            "Scenario": ["无储能辅助对照"] * 3 + ["成本—碳排放等权方案"] * 3,
+            "Region": ["RegionD"] * 6,
+            "Hour": [0, 1, 2, 0, 1, 2],
+            "NetGridImport_MW": [-100.0, -50.0, -80.0, -180.0, -180.0, -180.0],
+        }
+    )
+    基准指标 = pd.DataFrame(
+        {
+            "Region": ["RegionD"],
+            "PeakNetImport_MW": [200.0],
+            "NetImportStd_MW": [10.0],
+            "MeanHourlyRamp_MW_per_h": [10.0],
+            "PeakValleyRange_MW": [20.0],
+        }
+    )
+    指标 = 计算区域峰值波动(逐时结果, 基准指标)
+    assert (指标["PeakNetImport_MW"] == 0.0).all()
+    等权 = 指标[指标["Scenario"] == "成本—碳排放等权方案"].iloc[0]
+    assert 等权["StoragePeakReduction_MW"] == 0.0

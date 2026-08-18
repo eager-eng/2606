@@ -163,7 +163,8 @@ def 计算区域峰值波动(逐时结果, 基准指标):
         子表 = 子表.sort_values("Hour")
         净购电 = 子表["NetGridImport_MW"].to_numpy(dtype=float)
         峰值位置 = int(np.argmax(净购电))
-        峰值 = float(净购电[峰值位置])
+        峰值 = max(float(净购电[峰值位置]), 0.0)
+        峰值时刻 = int(子表.iloc[峰值位置]["Hour"]) if 峰值 > 0 else np.nan
         标准差 = float(np.std(净购电, ddof=0))
         平均爬坡 = float(np.mean(np.abs(np.diff(净购电)))) if len(净购电) > 1 else 0.0
         峰谷差 = float(np.max(净购电) - np.min(净购电))
@@ -176,7 +177,7 @@ def 计算区域峰值波动(逐时结果, 基准指标):
                 "Scenario": 场景,
                 "Region": 区域,
                 "PeakNetImport_MW": 峰值,
-                "PeakHour_h": int(子表.iloc[峰值位置]["Hour"]),
+                "PeakHour_h": 峰值时刻,
                 "PeakReduction_MW": 基准峰值 - 峰值,
                 "PeakReductionRate": (基准峰值 - 峰值) / abs(基准峰值) if abs(基准峰值) > 1e-12 else np.nan,
                 "NetImportStd_MW": 标准差,
@@ -262,7 +263,7 @@ def 构造基准区域指标(附件基准):
         行列表.append(
             {
                 "Region": 区域,
-                "PeakNetImport_MW": float(np.max(净购电)),
+                "PeakNetImport_MW": max(float(np.max(净购电)), 0.0),
                 "NetImportStd_MW": float(np.std(净购电, ddof=0)),
                 "MeanHourlyRamp_MW_per_h": float(np.mean(np.abs(np.diff(净购电)))),
                 "PeakValleyRange_MW": float(np.max(净购电) - np.min(净购电)),
@@ -480,10 +481,12 @@ def 生成问题三报告(系统指标, 区域指标, 检验结果, 求解统计
     无储能 = 指标.loc["无储能辅助对照"]
     等权 = 指标.loc["成本—碳排放等权方案"]
     区域等权 = 区域指标[区域指标["Scenario"] == "成本—碳排放等权方案"]
-    最佳峰值区域 = 区域等权.loc[区域等权["PeakReductionRate"].idxmax()]
     波动改善区域数 = int((区域等权["FluctuationReductionRate"] > 0).sum())
     储能峰值改善区域数 = int((区域等权["StoragePeakReduction_MW"] > 1e-6).sum())
     储能波动改善区域数 = int((区域等权["StorageNetImportStdReduction_MW"] > 1e-6).sum())
+    储能峰值改善 = 区域等权[区域等权["StoragePeakReduction_MW"] > 1e-6]
+    储能峰值区域 = "、".join(储能峰值改善["Region"].tolist()) if len(储能峰值改善) else "无"
+    储能峰值降幅 = float(储能峰值改善["StoragePeakReduction_MW"].max()) if len(储能峰值改善) else 0.0
     内容 = f"""# 问题三计算结果
 
 ## 求解概况
@@ -499,8 +502,8 @@ def 生成问题三报告(系统指标, 区域指标, 检验结果, 求解统计
 - 等权方案净运行成本为 {等权['OperatingCost_CNY']:,.2f} CNY，较附件基准变化 {等权['CostChangeRate']:.2%}；碳排放为 {等权['CarbonEmission_tCO2']:,.2f} tCO2，较附件基准变化 {等权['CarbonChangeRate']:.2%}。
 - 单独考察储能增量作用，等权方案相对无储能辅助对照的净运行成本变化为 {等权['StorageIncrementalCost_CNY']:,.2f} CNY（{等权['StorageIncrementalCostRate']:.2%}），碳排放变化为 {等权['StorageIncrementalCarbon_tCO2']:,.2f} tCO2（{等权['StorageIncrementalCarbonRate']:.2%}）。
 - 等权方案累计充电量为 {等权['ChargeEnergy_MWh']:,.2f} MWh，累计放电量为 {等权['DischargeEnergy_MWh']:,.2f} MWh。
-- 区域峰值改善最大的是 {最佳峰值区域['Region']}，峰值净购电功率降低 {最佳峰值区域['PeakReductionRate']:.2%}；六个区域中有 {波动改善区域数} 个区域的净购电标准差低于附件基准。
-- 与无储能辅助对照直接比较，储能使 {储能峰值改善区域数} 个区域的峰值净购电功率进一步下降，使 {储能波动改善区域数} 个区域的净购电标准差进一步下降；其余区域因新能源已足以覆盖负荷，储能增量影响为零。
+- 峰值净购电功率按 `max(max(NetGridImport_MW, 0))` 计算。等权方案下六个区域的峰值净购电功率均为 0 MW；六个区域中有 {波动改善区域数} 个区域的净购电标准差低于附件基准。
+- 与无储能辅助对照直接比较，储能使 {储能峰值改善区域数} 个区域的峰值净购电功率进一步下降，其中 {储能峰值区域} 降低 {储能峰值降幅:.2f} MW；同时使 {储能波动改善区域数} 个区域的净购电标准差进一步下降。全时段净外送只计为购电峰值 0 MW，不再把外送增加误计为削峰。
 
 成本为负时表示售电收入高于购电支出，是题目允许新能源售电且未计固定运维成本时的净结算结果。附件原始运行状态仍是正式基准；无储能辅助对照只用于从“新能源重新分配与购售电优化”的总体效应中分离储能充放电带来的增量影响，不作为归一化基准。
 
