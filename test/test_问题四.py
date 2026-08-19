@@ -231,3 +231,33 @@ def test_核心结果表包含时延和服务质量字段():
         "P95等待时间_h",
     }.issubset(情景表.columns)
     assert "最大网络时延" in set(基准表["指标"])
+
+
+def test_单因素情景前四项共用可行暖启动(monkeypatch):
+    初始任务 = pd.DataFrame()
+    统一能源 = pd.DataFrame({"GridPurchase_MW": [0.0]})
+    调用记录 = []
+
+    def 模拟协调(*参数, **关键字):
+        调用记录.append((参数[6], 关键字.get("初始暖启动"), 关键字["最大迭代"]))
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), {}, pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+    monkeypatch.setattr(问题四, "协调任务与能源", 模拟协调)
+    monkeypatch.setattr(问题四, "构造电价情景", lambda 数据, _: 数据.copy())
+    monkeypatch.setattr(问题四, "构造新能源波动情景", lambda 数据, _: 数据.copy())
+    问题四.运行单因素情景(
+        初始任务,
+        pd.DataFrame(),
+        pd.DataFrame(),
+        pd.DataFrame(),
+        pd.DataFrame(),
+        pd.DataFrame(),
+        0.0,
+        0.0,
+        {"CarbonMin_tCO2": 0.0, "CarbonMax_tCO2": 1.0},
+        统一初始能源=统一能源,
+    )
+    assert len(调用记录) == 6
+    assert all(暖启动 is 统一能源 for _, 暖启动, _ in 调用记录[:4])
+    assert all(暖启动 is None for _, 暖启动, _ in 调用记录[4:])
+    assert all(迭代数 == 问题四.统一协调迭代数 for _, _, 迭代数 in 调用记录)
